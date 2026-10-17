@@ -1,0 +1,233 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Correlation Reading Matrix</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Source+Sans+3:wght@400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one column worksheet; a 3x2 decision grid is the centerpiece, scale + example below */
+:root{
+  --bg:#f6f7f9; --surface:#ffffff; --fg:#1b2330; --muted:#5b6575; --line:#d9dee6;
+  --accent:#2f5d8a;
+  --pos:#1f7a52; --pos-bg:#e5f3ec;
+  --neg:#b2452f; --neg-bg:#f8e7e2;
+  --weak:#8a6a12; --weak-bg:#f6efd9;
+  --ns:#7b8494; --ns-bg:#eef0f3;
+  --display:"Fraunces",Georgia,serif;
+  --body:"Source Sans 3",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#12161c; --surface:#1a2029; --fg:#e6e9ee; --muted:#9aa4b2; --line:#2c3440;
+  --accent:#8db6e0;
+  --pos:#6fd3a2; --pos-bg:#173326;
+  --neg:#f0957f; --neg-bg:#3a201a;
+  --weak:#e6c56a; --weak-bg:#342b14;
+  --ns:#9aa4b2; --ns-bg:#222932;
+  color-scheme:dark;}}
+:root[data-theme="dark"]{
+  --bg:#12161c; --surface:#1a2029; --fg:#e6e9ee; --muted:#9aa4b2; --line:#2c3440;
+  --accent:#8db6e0;
+  --pos:#6fd3a2; --pos-bg:#173326;
+  --neg:#f0957f; --neg-bg:#3a201a;
+  --weak:#e6c56a; --weak-bg:#342b14;
+  --ns:#9aa4b2; --ns-bg:#222932;
+  color-scheme:dark;}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:16px;line-height:1.55}
+.wrap{max-width:1040px;margin:0 auto;padding-block:40px 64px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));display:flex;flex-direction:column;gap:36px}
+h1,h2{font-family:var(--display);text-wrap:balance;margin:0;line-height:1.15}
+h1{font-size:clamp(28px,4.4vw,40px)}
+h2{font-size:22px}
+.eyebrow{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);font-weight:700;margin:0 0 8px}
+.lede{max-width:66ch;color:var(--muted);margin:12px 0 0}
+code,.mono{font-family:var(--mono);font-size:.92em}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:20px}
+.step{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px}
+.step b{display:block;font-size:13px;letter-spacing:.06em;text-transform:uppercase;color:var(--accent);margin-bottom:4px}
+.step p{margin:0;font-size:15px}
+
+/* matrix */
+.matrix-scroll{overflow-x:auto}
+.matrix{display:grid;grid-template-columns:150px 1fr 1fr;gap:10px;min-width:680px}
+.hdr{font-weight:700;font-size:14px;padding:10px 14px;border-radius:8px;background:var(--surface);border:1px solid var(--line)}
+.hdr small{display:block;font-weight:400;color:var(--muted);font-family:var(--mono);font-size:12.5px}
+.rowhdr{display:flex;flex-direction:column;justify-content:center}
+.rowhdr .sym{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.corner{background:transparent;border:none}
+.cell{border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:8px;border:1px solid transparent}
+.cell .tag{align-self:flex-start;font-size:12px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 9px;border-radius:999px}
+.cell h3{margin:0;font-size:17px;line-height:1.3}
+.cell p{margin:0;font-size:14.5px}
+.cell .ex{font-size:13.5px;color:var(--muted)}
+.cell .do{font-size:14px;font-weight:600}
+.pos{background:var(--pos-bg)} .pos .tag{background:var(--pos);color:var(--bg)} .pos h3{color:var(--pos)}
+.neg{background:var(--neg-bg)} .neg .tag{background:var(--neg);color:var(--bg)} .neg h3{color:var(--neg)}
+.weak{background:var(--weak-bg)} .weak .tag{background:var(--weak);color:var(--bg)} .weak h3{color:var(--weak)}
+.ns{background:var(--ns-bg);border-color:var(--line);border-style:dashed} .ns .tag{background:var(--ns);color:var(--bg)} .ns h3{color:var(--ns)}
+
+/* strength scale */
+.scale{margin-top:16px}
+.bar{display:grid;grid-template-columns:3fr 4fr 3fr 3fr 3fr 4fr 3fr;height:36px;border-radius:8px;overflow:hidden;border:1px solid var(--line)}
+.bar div{display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;text-align:center;line-height:1.1;padding:0 4px}
+.s-neg-strong{background:var(--neg);color:var(--bg)}
+.s-neg-mod{background:var(--neg-bg);color:var(--neg)}
+.s-weak{background:var(--weak-bg);color:var(--weak)}
+.s-pos-mod{background:var(--pos-bg);color:var(--pos)}
+.s-pos-strong{background:var(--pos);color:var(--bg)}
+.ticks{display:grid;grid-template-columns:3fr 4fr 3fr 3fr 3fr 4fr 3fr;font-family:var(--mono);font-size:12px;color:var(--muted);margin-top:6px}
+.ticks span{position:relative}
+.ticks span:first-child{text-align:left}
+.ticks .r{text-align:right}
+.note{font-size:14px;color:var(--muted);max-width:70ch;margin:10px 0 0}
+
+/* example */
+.example{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}
+@media (max-width:720px){.example{grid-template-columns:1fr}}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:16px 18px;min-width:0}
+.panel h3{margin:0 0 10px;font-size:16px}
+table{border-collapse:collapse;width:100%;font-family:var(--mono);font-size:13.5px;font-variant-numeric:tabular-nums}
+th,td{padding:6px 8px;border-bottom:1px solid var(--line);text-align:right}
+th:first-child,td:first-child{text-align:left}
+th{font-weight:500;color:var(--muted)}
+.panel ol{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:15px}
+.callout{border-left:3px solid var(--accent);padding:4px 0 4px 14px;font-size:15px;max-width:72ch}
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">ANLY 615 · Correlation analysis</p>
+    <h1>How to read a correlation result</h1>
+    <p class="lede">Example from class: is <b>customer satisfaction</b> related to <b>renewal intention</b>? There is no IV or DV here, just two variables and one question: is there a linear relationship, and which way does it go?</p>
+    <div class="steps">
+      <div class="step"><b>Step 1 · Check p</b><p>Is <code>p &lt; .05</code>? If not, stop. The result is not significant and you disregard it.</p></div>
+      <div class="step"><b>Step 2 · Check the sign of r</b><p><code>+</code> means they rise together. <code>−</code> means one rises as the other falls.</p></div>
+      <div class="step"><b>Step 3 · Check the size of r</b><p>Closer to <code>±1</code> is stronger. Closer to <code>0</code> is weaker.</p></div>
+    </div>
+  </header>
+
+  <section>
+    <p class="eyebrow">The four possible conclusions</p>
+    <h2>First: are they related? Then: how?</h2>
+    <div class="steps">
+      <div class="step"><b style="color:var(--pos)">1 · Positive relationship</b><p>Significant, r is positive. Higher satisfaction goes with higher renewal intention.</p></div>
+      <div class="step"><b style="color:var(--neg)">2 · Negative relationship</b><p>Significant, r is negative. Higher satisfaction goes with lower renewal intention.</p></div>
+      <div class="step"><b style="color:var(--weak)">3 · No (weak) relationship</b><p>Significant, but r is close to 0. Any relationship is very weak.</p></div>
+      <div class="step"><b style="color:var(--ns)">4 · Insignificant relationship</b><p>p ≥ .05, whatever the sign or size of r. Forget it: they are not related.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <p class="eyebrow">The matrix</p>
+    <h2>Direction × significance</h2>
+    <div class="matrix-scroll" style="margin-top:16px">
+      <div class="matrix" role="table" aria-label="Correlation interpretation matrix">
+        <div class="hdr corner" role="columnheader"></div>
+        <div class="hdr" role="columnheader">Significant<small>p &lt; .05</small></div>
+        <div class="hdr" role="columnheader">Not significant<small>p ≥ .05</small></div>
+
+        <div class="hdr rowhdr" role="rowheader">Positive<span class="sym">r → +1</span></div>
+        <div class="cell pos">
+          <span class="tag">Interpret</span>
+          <h3>Positive relationship</h3>
+          <p>As satisfaction goes up, renewal intention goes up. The closer r is to +1, the stronger the positive correlation.</p>
+          <p class="ex">e.g. r = .72, p &lt; .001 → strong positive</p>
+          <p class="do">Report it. Satisfied customers are more likely to renew.</p>
+        </div>
+        <div class="cell ns">
+          <span class="tag">Disregard</span>
+          <h3>Insignificant relationship</h3>
+          <p>The coefficient is positive, but it could be due to chance.</p>
+          <p class="ex">e.g. r = .18, p = .21</p>
+          <p class="do">Ignore the sign and size. Treat as no relationship.</p>
+        </div>
+
+        <div class="hdr rowhdr" role="rowheader">Near zero<span class="sym">r ≈ 0 (either sign)</span></div>
+        <div class="cell weak">
+          <span class="tag">Interpret</span>
+          <h3>No (weak) relationship</h3>
+          <p>A real relationship exists, but it is weak. Satisfaction only slightly tracks renewal intention.</p>
+          <p class="ex">e.g. r = .12, p = .03 → weak but significant</p>
+          <p class="do">Report it as weak. Don't overstate its practical importance.</p>
+        </div>
+        <div class="cell ns">
+          <span class="tag">Disregard</span>
+          <h3>Insignificant relationship</h3>
+          <p>Small coefficient and not significant. Nothing to see here.</p>
+          <p class="ex">e.g. r = .04, p = .68</p>
+          <p class="do">Ignore it. Conclude no linear relationship.</p>
+        </div>
+
+        <div class="hdr rowhdr" role="rowheader">Negative<span class="sym">r → −1</span></div>
+        <div class="cell neg">
+          <span class="tag">Interpret</span>
+          <h3>Negative relationship</h3>
+          <p>As satisfaction goes up, renewal intention goes down. The closer r is to −1, the stronger the negative correlation.</p>
+          <p class="ex">e.g. r = −.65, p &lt; .001 → strong negative</p>
+          <p class="do">Report it. Unexpected for this example, so check the data and coding.</p>
+        </div>
+        <div class="cell ns">
+          <span class="tag">Disregard</span>
+          <h3>Insignificant relationship</h3>
+          <p>The coefficient is negative, but it could be due to chance.</p>
+          <p class="ex">e.g. r = −.20, p = .14</p>
+          <p class="do">Ignore the sign and size. Treat as no relationship.</p>
+        </div>
+      </div>
+    </div>
+    <p class="callout" style="margin-top:16px"><b>Rule from class:</b> as long as it's significant, you interpret it. If it's insignificant, forget it, whatever the sign.</p>
+  </section>
+
+  <section>
+    <p class="eyebrow">Strength guide (only after p &lt; .05)</p>
+    <h2>How strong is r?</h2>
+    <div class="matrix-scroll">
+      <div class="scale" style="min-width:560px">
+        <div class="bar" aria-hidden="true">
+          <div class="s-neg-strong">Strong −</div>
+          <div class="s-neg-mod">Moderate −</div>
+          <div class="s-weak">Weak −</div>
+          <div class="s-weak">≈ 0</div>
+          <div class="s-weak">Weak +</div>
+          <div class="s-pos-mod">Moderate +</div>
+          <div class="s-pos-strong">Strong +</div>
+        </div>
+        <div class="ticks">
+          <span>−1.0</span><span class="r">−0.7</span><span class="r">−0.3</span><span style="text-align:center">0</span><span>+0.3</span><span>+0.7</span><span class="r">+1.0</span>
+        </div>
+      </div>
+    </div>
+    <p class="note">Common rule of thumb: |r| below .3 is weak, .3 to .7 is moderate, above .7 is strong. Cutoffs vary by textbook, so use the ones your instructor gives. With large samples, even a tiny r can be significant, which is why size still matters after p passes.</p>
+  </section>
+
+  <section>
+    <p class="eyebrow">Worked example</p>
+    <h2>Reading the output</h2>
+    <div class="example" style="margin-top:16px">
+      <div class="panel">
+        <h3>Sample correlation output (illustrative numbers)</h3>
+        <div class="matrix-scroll">
+        <table>
+          <thead><tr><th></th><th>Satisfaction</th><th>Renewal</th></tr></thead>
+          <tbody>
+            <tr><td>Satisfaction · r</td><td>1</td><td>.684**</td></tr>
+            <tr><td>Sig. (2-tailed)</td><td></td><td>.000</td></tr>
+            <tr><td>N</td><td>250</td><td>250</td></tr>
+          </tbody>
+        </table>
+        </div>
+        <p class="note">** Correlation is significant at the 0.01 level. SPSS prints p &lt; .0005 as ".000".</p>
+      </div>
+      <div class="panel">
+        <h3>How to read it</h3>
+        <ol>
+          <li><b>p = .000</b>, below .05, so it's significant. Keep going.</li>
+          <li><b>r is positive</b>, so the cell is "Positive relationship".</li>
+          <li><b>r = .684</b> is close to .7, so it's a moderate to strong positive correlation.</li>
+          <li><b>Write-up:</b> “Satisfaction and renewal intention were significantly and positively correlated, r(248) = .68, p &lt; .001.”</li>
+        </ol>
+      </div>
+    </div>
+    <p class="callout" style="margin-top:16px">Correlation shows association, not cause. It tells you satisfaction and renewal move together, not that one causes the other.</p>
+  </section>
+</div>
+
+</body></html>
